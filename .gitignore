@@ -1,0 +1,5 @@
+GEMINI.md
+__pycache__/
+*.pyc
+.env
+config.local.ini

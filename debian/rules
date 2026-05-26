@@ -1,0 +1,11 @@
+#!/usr/bin/make -f
+export DH_VERBOSE = 1
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	# Nichts zu bauen, da Python
+
+override_dh_auto_install:
+	$(MAKE) install DESTDIR=debian/galert PREFIX=/usr
