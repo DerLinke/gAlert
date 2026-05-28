@@ -37,6 +37,13 @@ Folge den interaktiven Anweisungen im Terminal:
 2. Drücke `[P]` für eine Vorschau.
 3. Drücke `[I]` zur Installation als Systemsound (z.B. Button-Klick, Fehlermeldung).
 
+## API & Attribution
+
+`gAlert` nutzt die **Freesound APIv2** zur Bereitstellung von Audio-Inhalten. Wir unterstützen und fördern die Einhaltung der Creative Commons Lizenzen:
+
+- **Attribution (CC-BY)**: Bei diesen Sounds zeigt `gAlert` den Namen des Urhebers und einen Link zum Original-Sound an. Bitte achte darauf, diese Informationen zu respektieren, falls du die Sounds in eigenen Projekten weiterverwendest.
+- **Powered by Freesound**: Dieses Tool ist ein unabhängiges Projekt, das die großartige Datenbank von [Freesound.org](https://freesound.org) nutzt.
+
 ## API-Key Konfiguration
 
 Standardmäßig nutzt `gAlert` einen integrierten API-Key. Wenn du deinen eigenen Key verwenden möchtest, kannst du diesen auf zwei Arten konfigurieren:

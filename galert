@@ -84,7 +84,7 @@ class FreesoundAPI:
             "query": query,
             "token": self.token,
             "filter": 'license:"Creative Commons 0" OR license:"Attribution"',
-            "fields": "id,name,license,previews",
+            "fields": "id,name,license,previews,username,url",
             "page_size": limit
         }
         try:
@@ -201,7 +201,7 @@ class CLI:
     def show_banner(self):
         if not HAS_RICH:
             # Info wurde bereits im globalen Check ausgegeben
-            print(f"--- gAlert v1.0.0 ---\n")
+            print(f"--- gAlert v1.0.0 (Powered by Freesound.org) ---\n")
             return
 
         C_L0, C_L1, C_L5, C_L6, C_L10, C_L11 = "[rgb(255,0,0)]", "[rgb(245,0,10)]", "[rgb(208,0,47)]", "[rgb(198,0,57)]", "[rgb(161,0,94)]", "[rgb(151,0,104)]"
@@ -210,7 +210,8 @@ class CLI:
         rprint(f"     {C_L5}█{C_L6}█[/]                    {C_R26}█{C_R27}█[/]")
         rprint(f"{C_L0}█{C_L1}█[/]                {C_R18}█{C_R19}█{C_R20}█{C_R21}█{C_R22}█[/] [bold white]gAlert v1.0.0[/bold white]")
         rprint(f"     {C_L5}█{C_L6}█[/]                    {C_R26}█{C_R27}█[/]")
-        rprint(f"          {C_L10}█{C_L11}█[/]     {C_R17}█{C_R18}█{C_R19}█{C_R20}█{C_R21}█[/]\n")
+        rprint(f"          {C_L10}█{C_L11}█[/]     {C_R17}█{C_R18}█{C_R19}█{C_R20}█{C_R21}█[/]")
+        rprint(f"  [dim]Powered by [blue underline]https://freesound.org[/][/]\n")
 
     def run(self):
         self.show_banner()
@@ -231,8 +232,14 @@ class CLI:
             print("Keine Ergebnisse gefunden.")
             return
 
+        print("")
         for i, res in enumerate(results, 1):
-            print(f"{i}. [{res['id']}] {res['name']} ({res['license']})")
+            if HAS_RICH:
+                rprint(f"[bold cyan]{i}.[/] {res['name']}")
+                rprint(f"   [dim]ID: {res['id']} | Lizenz: {res['license']} | Von: {res['username']}[/]")
+            else:
+                print(f"{i}. {res['name']}")
+                print(f"   ID: {res['id']} | Lizenz: {res['license']} | Von: {res['username']}")
 
         choice = input("\nWähle eine Nummer (1-5) oder 'q' zum Beenden: ")
         if choice.lower() == 'q' or not choice.isdigit() or int(choice) > len(results):
@@ -254,7 +261,13 @@ class CLI:
         temp_file = Path("/tmp") / f"galert_{sound_data['id']}.ogg"
         
         while True:
-            print(f"\nGewählter Sound: {sound_data['name']}")
+            if HAS_RICH:
+                rprint(f"\n[bold]Gewählter Sound:[/] [cyan]{sound_data['name']}[/]")
+                rprint(f"[dim]Original:[/] [blue underline]{sound_data['url']}[/]")
+            else:
+                print(f"\nGewählter Sound: {sound_data['name']}")
+                print(f"Original: {sound_data['url']}")
+            
             print("[P] Preview anhören")
             print("[I] Als Systemsound installieren")
             print("[A] Abbrechen")
