@@ -7,6 +7,10 @@ import shutil
 import configparser
 from pathlib import Path
 
+# --- INITIALISIERUNG ---
+SCRIPTNAME = "gAlert"
+VERSION = "1.1.0"
+
 # --- Globaler Abhängigkeiten-Check (Idiotensicher für Git-Cloner) ---
 MISSING_DEPS = []
 
@@ -208,7 +212,7 @@ class CLI:
         C_R17, C_R18, C_R19, C_R20, C_R21, C_R22, C_R26, C_R27 = "[rgb(96,0,159)]", "[rgb(86,0,169)]", "[rgb(76,0,179)]", "[rgb(66,0,189)]", "[rgb(56,0,199)]", "[rgb(47,0,208)]", "[rgb(9,0,246)]", "[rgb(0,0,255)]"
         rprint(f"          {C_L10}█{C_L11}█[/]     {C_R17}█{C_R18}█{C_R19}█{C_R20}█{C_R21}█[/]")
         rprint(f"     {C_L5}█{C_L6}█[/]                    {C_R26}█{C_R27}█[/]")
-        rprint(f"{C_L0}█{C_L1}█[/]                {C_R18}█{C_R19}█{C_R20}█{C_R21}█{C_R22}█[/] [bold white]gAlert v1.1.0[/bold white]")
+        rprint(f"{C_L0}█{C_L1}█[/]                {C_R18}█{C_R19}█{C_R20}█{C_R21}█{C_R22}█[/] [bold white]{SCRIPTNAME} v{VERSION}[/bold white]")
         rprint(f"     {C_L5}█{C_L6}█[/]                    {C_R26}█{C_R27}█[/]")
         rprint(f"          {C_L10}█{C_L11}█[/]     {C_R17}█{C_R18}█{C_R19}█{C_R20}█{C_R21}█[/]")
         rprint(f"  [dim]Powered by [blue underline]https://freesound.org[/][/]\n")
@@ -224,12 +228,31 @@ class CLI:
         else:
             parser.print_help()
 
+    def show_footer(self):
+        if not HAS_RICH:
+            print(f"\n--- {SCRIPTNAME} v{VERSION} ---")
+            print("Web: https://derlinke.github.io/")
+            return
+
+        rprint(f"\n[blue]----------------------------------------------------[/]")
+        rprint(f"  [bold white]{SCRIPTNAME} v{VERSION}[/bold white]")
+        rprint(f"  [dim]Web:[/][blue underline] https://derlinke.github.io/[/]")
+        rprint(f"  [dim]Git:[/][blue underline] https://github.com/DerLinke/gAlert[/]")
+        
+        # Kleines Logo-Icon (Cyber-Strip)
+        C_L0 = "[rgb(255,0,0)]"
+        C_L10 = "[rgb(161,0,94)]"
+        C_R27 = "[rgb(0,0,255)]"
+        rprint(f"  {C_L0}██[/]{C_L10}██[/]{C_R27}██[/]")
+        rprint(f"[blue]====================================================[/]\n")
+
     def handle_search(self, query):
         print(f"Suche nach '{query}' auf Freesound.org...")
         results = self.api.search(query)
 
         if not results:
             print("Keine Ergebnisse gefunden.")
+            self.show_footer()
             return
 
         print("")
@@ -241,6 +264,7 @@ class CLI:
                 print(f"{i}. {res['name']}")
                 print(f"   ID: {res['id']} | Lizenz: {res['license']} | Von: {res['username']}")
 
+        self.show_footer()
         choice = input("\nWähle eine Nummer (1-5) oder 'q' zum Beenden: ")
         if choice.lower() == 'q' or not choice.isdigit() or int(choice) > len(results):
             return

@@ -4,7 +4,9 @@
 
 ---
 <p align="center">
-  <img src="https://derlinke.github.io/logo.svg" width="450" alt="gAlert Logo">
+  <img src="https://derlinke.github.io/logo.svg" width="300" alt="Logo"><br>
+  <strong>DerLinke Software Zentrale</strong><br>
+  <a href="https://derlinke.github.io/">Offizielle Webseite</a> | <a href="https://github.com/DerLinke/gAlert">GitHub Repository</a>
 </p>
 
 ## 🚀 Kernfunktionen

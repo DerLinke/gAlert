@@ -3,7 +3,10 @@
 
 set -e
 
-VERSION="${1:-1.1.0}"
+# Version ermitteln (entweder aus galert extrahieren oder Argument)
+VERSION_FILE="galert"
+VERSION=$(grep "^VERSION =" "$VERSION_FILE" | cut -d'"' -f2)
+VERSION="${1:-$VERSION}"
 APP_NAME="galert"
 MAINTAINER="Daniel Frey <https://github.com/DerLinke>"
 DESCRIPTION="Freesound CLI Sound Installer for Linux"
