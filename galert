@@ -208,7 +208,7 @@ class CLI:
         C_R17, C_R18, C_R19, C_R20, C_R21, C_R22, C_R26, C_R27 = "[rgb(96,0,159)]", "[rgb(86,0,169)]", "[rgb(76,0,179)]", "[rgb(66,0,189)]", "[rgb(56,0,199)]", "[rgb(47,0,208)]", "[rgb(9,0,246)]", "[rgb(0,0,255)]"
         rprint(f"          {C_L10}█{C_L11}█[/]     {C_R17}█{C_R18}█{C_R19}█{C_R20}█{C_R21}█[/]")
         rprint(f"     {C_L5}█{C_L6}█[/]                    {C_R26}█{C_R27}█[/]")
-        rprint(f"{C_L0}█{C_L1}█[/]                {C_R18}█{C_R19}█{C_R20}█{C_R21}█{C_R22}█[/] [bold white]gAlert v1.0.0[/bold white]")
+        rprint(f"{C_L0}█{C_L1}█[/]                {C_R18}█{C_R19}█{C_R20}█{C_R21}█{C_R22}█[/] [bold white]gAlert v1.1.0[/bold white]")
         rprint(f"     {C_L5}█{C_L6}█[/]                    {C_R26}█{C_R27}█[/]")
         rprint(f"          {C_L10}█{C_L11}█[/]     {C_R17}█{C_R18}█{C_R19}█{C_R20}█{C_R21}█[/]")
         rprint(f"  [dim]Powered by [blue underline]https://freesound.org[/][/]\n")
