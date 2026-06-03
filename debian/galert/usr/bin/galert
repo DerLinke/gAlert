@@ -1,0 +1,321 @@
+#!/usr/bin/env python3
+import os
+import sys
+import argparse
+import subprocess
+import shutil
+import configparser
+from pathlib import Path
+
+# --- Globaler Abhängigkeiten-Check (Idiotensicher für Git-Cloner) ---
+MISSING_DEPS = []
+
+try:
+    import requests
+except ImportError:
+    MISSING_DEPS.append("python3-requests")
+
+try:
+    from rich import print as rprint
+    HAS_RICH = True
+except ImportError:
+    HAS_RICH = False
+    rprint = print
+
+if MISSING_DEPS:
+    print("\n[-] Fehler: Erforderliche Python-Abhängigkeiten fehlen:")
+    for dep in MISSING_DEPS:
+        print(f"    - {dep}")
+    print("\nBitte installiere die Abhängigkeiten über 'install.sh' oder nutze das .deb-Paket.")
+    sys.exit(1)
+
+if not HAS_RICH:
+    print("[*] Hinweis: 'python3-rich' fehlt. Das Tool läuft im farblosen Fallback-Modus.\n")
+
+# --- Konstanten & Standard-Konfiguration ---
+DEFAULT_TOKEN = "lapcohz5okgVxOpTlrNnNSBQaY10kqVKuY8jwzOm"
+CONFIG_FILE = Path.home() / ".config" / "galert" / "config.ini"
+SOUND_THEME_NAME = "gAlert"
+THEME_PATH = Path.home() / ".local" / "share" / "sounds" / SOUND_THEME_NAME
+STEREO_PATH = THEME_PATH / "stereo"
+
+# Event Mapping für die Installation
+EVENT_MAPPING = {
+    "1": ("button-pressed.ogg", "Standard-Klickton (z. B. beim Klicken auf Schaltflächen, Cinnamon-Menüs oder Applets)"),
+    "2": ("message-new-instant.ogg", "Benachrichtigungston (z. B. bei neuen Chat- oder System-Nachrichten)"),
+    "3": ("dialog-error.ogg", "System-Fehlerton (Der klassische Warnton bei Fehlermeldungen oder blockierten Aktionen)"),
+    "4": ("desktop-login.ogg", "Anmeldesound (Wird einmalig direkt nach dem Desktop-Login abgespielt)")
+}
+
+class ConfigManager:
+    """Verwaltet die Konfiguration und den API-Key."""
+    def __init__(self):
+        self.token = self._load_token()
+
+    def _load_token(self):
+        # 1. Priorität: Umgebungsvariable
+        env_token = os.environ.get("GALERT_API_KEY")
+        if env_token:
+            return env_token
+        
+        # 2. Priorität: Konfigurationsdatei
+        if CONFIG_FILE.exists():
+            config = configparser.ConfigParser()
+            try:
+                config.read(CONFIG_FILE)
+                if "API" in config and "token" in config["API"]:
+                    return config["API"]["token"]
+            except Exception:
+                pass
+        
+        # 3. Priorität: Hardcoded Default
+        return DEFAULT_TOKEN
+
+class FreesoundAPI:
+    """Kommunikation mit der Freesound.org APIv2."""
+    BASE_URL = "https://freesound.org/apiv2"
+
+    def __init__(self, token):
+        self.token = token
+
+    def search(self, query, limit=5):
+        url = f"{self.BASE_URL}/search/text/"
+        params = {
+            "query": query,
+            "token": self.token,
+            "filter": 'license:"Creative Commons 0" OR license:"Attribution"',
+            "fields": "id,name,license,previews,username,url",
+            "page_size": limit
+        }
+        try:
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            return response.json().get("results", [])
+        except requests.exceptions.RequestException as e:
+            print(f"Fehler bei der API-Anfrage: {e}")
+            return []
+
+    def download_preview(self, preview_url, target_path):
+        try:
+            response = requests.get(preview_url, stream=True, timeout=15)
+            response.raise_for_status()
+            with open(target_path, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            
+            # DOWNLOAD-SCHUTZ: Existenz und Größe prüfen
+            if target_path.exists() and target_path.stat().st_size > 0:
+                return True
+            else:
+                print("[-] Fehler: Heruntergeladene Datei ist leer oder korrupt.")
+                return False
+        except requests.exceptions.RequestException as e:
+            print(f"Fehler beim Download: {e}")
+            return False
+        except IOError as e:
+            print(f"[-] Fehler beim Schreiben der Datei: {e}")
+            return False
+
+class AudioPlayer:
+    """Spielt Audio-Dateien mit verschiedenen Fallbacks ab."""
+    @staticmethod
+    def play(file_path):
+        # DOWNLOAD-SCHUTZ: Vor Wiedergabe prüfen
+        if not file_path.exists() or file_path.stat().st_size == 0:
+            print("[-] Fehler: Audio-Datei existiert nicht oder ist leer.")
+            return False
+
+        # Fallback-Kette: paplay -> ogg123 -> aplay
+        players = [
+            ["paplay", str(file_path)],
+            ["ogg123", "-q", str(file_path)],
+            ["aplay", str(file_path)]
+        ]
+        
+        for cmd in players:
+            if shutil.which(cmd[0]):
+                try:
+                    subprocess.run(cmd, check=True, stderr=subprocess.DEVNULL)
+                    return True
+                except subprocess.CalledProcessError:
+                    continue
+        
+        print("Kein funktionierender Audio-Player gefunden (paplay, ogg123, aplay).")
+        return False
+
+class SoundInstaller:
+    """Installiert Sounds gemäß Freedesktop-Spezifikation."""
+    def __init__(self):
+        self._ensure_paths()
+
+    def _ensure_paths(self):
+        # RECHTE-SCHUTZ: try-except für Ordnererstellung
+        try:
+            STEREO_PATH.mkdir(parents=True, exist_ok=True)
+            self._create_index_theme()
+        except (PermissionError, OSError) as e:
+            print(f"[-] Fehler: Keine Schreibrechte in {THEME_PATH.parent}: {e}")
+            sys.exit(1)
+
+    def _create_index_theme(self):
+        index_file = THEME_PATH / "index.theme"
+        if not index_file.exists():
+            content = f"""[Sound Theme]
+Name={SOUND_THEME_NAME}
+Comment=Automatisch installierte Sounds via galert CLI
+Directories=stereo
+
+[stereo]
+OutputProfile=stereo
+"""
+            try:
+                with open(index_file, "w") as f:
+                    f.write(content)
+            except (PermissionError, OSError) as e:
+                print(f"[-] Fehler: Konnte index.theme nicht erstellen: {e}")
+                sys.exit(1)
+
+    def install(self, source_path, event_name):
+        # DOWNLOAD-SCHUTZ: Vor Installation prüfen
+        if not source_path.exists() or source_path.stat().st_size == 0:
+            print("[-] Fehler: Quelldatei existiert nicht oder ist leer.")
+            return False
+
+        target_file = STEREO_PATH / event_name
+        try:
+            shutil.copy(source_path, target_file)
+            print(f"Sound erfolgreich als '{event_name}' in '{SOUND_THEME_NAME}' installiert.")
+            return True
+        except (PermissionError, OSError) as e:
+            print(f"[-] Fehler beim Kopieren der Datei: {e}")
+            return False
+
+class CLI:
+    """Interaktive Kommandozeilen-Schnittstelle."""
+    def __init__(self):
+        self.config = ConfigManager()
+        self.api = FreesoundAPI(self.config.token)
+        self.player = AudioPlayer()
+        self.installer = SoundInstaller()
+
+    def show_banner(self):
+        if not HAS_RICH:
+            # Info wurde bereits im globalen Check ausgegeben
+            print(f"--- gAlert v1.0.0 (Powered by Freesound.org) ---\n")
+            return
+
+        C_L0, C_L1, C_L5, C_L6, C_L10, C_L11 = "[rgb(255,0,0)]", "[rgb(245,0,10)]", "[rgb(208,0,47)]", "[rgb(198,0,57)]", "[rgb(161,0,94)]", "[rgb(151,0,104)]"
+        C_R17, C_R18, C_R19, C_R20, C_R21, C_R22, C_R26, C_R27 = "[rgb(96,0,159)]", "[rgb(86,0,169)]", "[rgb(76,0,179)]", "[rgb(66,0,189)]", "[rgb(56,0,199)]", "[rgb(47,0,208)]", "[rgb(9,0,246)]", "[rgb(0,0,255)]"
+        rprint(f"          {C_L10}█{C_L11}█[/]     {C_R17}█{C_R18}█{C_R19}█{C_R20}█{C_R21}█[/]")
+        rprint(f"     {C_L5}█{C_L6}█[/]                    {C_R26}█{C_R27}█[/]")
+        rprint(f"{C_L0}█{C_L1}█[/]                {C_R18}█{C_R19}█{C_R20}█{C_R21}█{C_R22}█[/] [bold white]gAlert v1.1.0[/bold white]")
+        rprint(f"     {C_L5}█{C_L6}█[/]                    {C_R26}█{C_R27}█[/]")
+        rprint(f"          {C_L10}█{C_L11}█[/]     {C_R17}█{C_R18}█{C_R19}█{C_R20}█{C_R21}█[/]")
+        rprint(f"  [dim]Powered by [blue underline]https://freesound.org[/][/]\n")
+
+    def run(self):
+        self.show_banner()
+        parser = argparse.ArgumentParser(description="gAlert: Freesound CLI Sound Installer")
+        parser.add_argument("--search", type=str, help="Suchbegriff für Freesound.org")
+        args = parser.parse_args()
+
+        if args.search:
+            self.handle_search(args.search)
+        else:
+            parser.print_help()
+
+    def handle_search(self, query):
+        print(f"Suche nach '{query}' auf Freesound.org...")
+        results = self.api.search(query)
+
+        if not results:
+            print("Keine Ergebnisse gefunden.")
+            return
+
+        print("")
+        for i, res in enumerate(results, 1):
+            if HAS_RICH:
+                rprint(f"[bold cyan]{i}.[/] {res['name']}")
+                rprint(f"   [dim]ID: {res['id']} | Lizenz: {res['license']} | Von: {res['username']}[/]")
+            else:
+                print(f"{i}. {res['name']}")
+                print(f"   ID: {res['id']} | Lizenz: {res['license']} | Von: {res['username']}")
+
+        choice = input("\nWähle eine Nummer (1-5) oder 'q' zum Beenden: ")
+        if choice.lower() == 'q' or not choice.isdigit() or int(choice) > len(results):
+            return
+
+        selected = results[int(choice) - 1]
+        
+        # API-SCHUTZ: Robuster Zugriff auf Previews
+        previews = selected.get("previews", {})
+        preview_url = previews.get("preview-hq-ogg")
+        
+        if not preview_url:
+            print(f"[-] Fehler: Keine OGG-Vorschau für Sound ID {selected['id']} ('{selected['name']}') verfügbar.")
+            return
+
+        self.handle_item_menu(selected, preview_url)
+
+    def handle_item_menu(self, sound_data, preview_url):
+        temp_file = Path("/tmp") / f"galert_{sound_data['id']}.ogg"
+        
+        while True:
+            if HAS_RICH:
+                rprint(f"\n[bold]Gewählter Sound:[/] [cyan]{sound_data['name']}[/]")
+                rprint(f"[dim]Original:[/] [blue underline]{sound_data['url']}[/]")
+            else:
+                print(f"\nGewählter Sound: {sound_data['name']}")
+                print(f"Original: {sound_data['url']}")
+            
+            print("[P] Preview anhören")
+            print("[I] Als Systemsound installieren")
+            print("[A] Abbrechen")
+            
+            cmd = input("Aktion: ").lower()
+
+            if cmd == 'p':
+                if not temp_file.exists():
+                    print("Lade Vorschau herunter...")
+                    if not self.api.download_preview(preview_url, temp_file):
+                        continue
+                print("Spiele Vorschau ab...")
+                self.player.play(temp_file)
+            
+            elif cmd == 'i':
+                if not temp_file.exists():
+                    print("Lade Sound herunter...")
+                    if not self.api.download_preview(preview_url, temp_file):
+                        continue
+                
+                self.handle_install_menu(temp_file)
+                break
+            
+            elif cmd == 'a':
+                break
+
+    def handle_install_menu(self, sound_file):
+        print("\nVerfügbare Ereignisse:")
+        for k, (filename, description) in EVENT_MAPPING.items():
+            print(f"{k} = {filename}")
+            print(f"    -> {description}")
+        
+        ev_choice = input("\nWähle ein Ereignis (1-4): ")
+        if ev_choice in EVENT_MAPPING:
+            event_name = EVENT_MAPPING[ev_choice][0]
+            self.installer.install(sound_file, event_name)
+        else:
+            print("Ungültige Auswahl.")
+
+if __name__ == "__main__":
+    import traceback
+    try:
+        cli = CLI()
+        cli.run()
+    except KeyboardInterrupt:
+        print("\nAbgebrochen durch Benutzer.")
+        sys.exit(0)
+    except Exception as e:
+        print("\nEin unerwarteter Fehler ist aufgetreten:")
+        traceback.print_exc()
+        sys.exit(1)

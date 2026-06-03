@@ -1,0 +1,11 @@
+Package: galert
+Version: 1.0.0-1
+Architecture: all
+Maintainer: DerLinke <derlinke@users.noreply.github.com>
+Installed-Size: 20
+Depends: python3, python3-requests, python3-rich, pulseaudio-utils, vorbis-tools
+Section: utils
+Priority: optional
+Description: Freesound Systemsound Installer CLI
+ A command-line tool to search, preview, and install free sounds
+ from freesound.org as local desktop notification sounds.
